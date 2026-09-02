@@ -68,7 +68,7 @@ This project was created to practice:
 ## 🌐 Live Demo
 
 **GitHub Pages:**
-*Add your live demo URL here after enabling GitHub Pages.*
+https://hariprasad2812.github.io/Number-Guessing-game-/
 
 ## 👨‍💻 Author
 
