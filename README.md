@@ -62,11 +62,8 @@ This project was created to practice:
 
 ## 📸 Preview
 
-Add a screenshot or GIF of the game here:
+<img width="604" height="772" alt="image" src="https://github.com/user-attachments/assets/f0e59546-f1a9-4f67-9cc2-2d5c64fd6bd4" />
 
-```markdown
-![Neon Hunter Game](uploads/image.png)
-```
 
 ## 🌐 Live Demo
 
