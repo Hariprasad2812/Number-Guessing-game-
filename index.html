@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>NEON HUNTER — Number Guessing Game</title>
+<meta name="theme-color" content="#05060f" />
+<style>
+/* ============================================================
+   NEON HUNTER — premium number guessing game
+   Pure HTML / CSS / JS. No backend. No dependencies.
+   ============================================================ */
+
+:root{
+  --bg-0:#05060f;
+  --bg-1:#0a0b1e;
+  --cyan:#22e7ff;
+  --violet:#a855f7;
+  --pink:#ff3fa4;
+  --lime:#7CFF6B;
+  --amber:#ffb347;
+  --red:#ff4d6d;
+  --ice:#5bc8ff;
+  --text:#eaf2ff;
+  --muted:#8b95c9;
+  --glass:rgba(255,255,255,.045);
+  --stroke:rgba(255,255,255,.10);
+  --card-w:min(560px, 92vw);
+  --ease:cubic-bezier(.22,1,.36,1);
+  --ease-back:cubic-bezier(.34,1.56,.64,1);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+
+html,body{ height:100%; }
+body{
+  margin:0;
+  min-height:100svh;
+  font-family:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,"Inter",Roboto,Helvetica,Arial,sans-serif;
+  color:var(--text);
+  background:var(--bg-0);
+  overflow-x:hidden;
+  display:grid;
+  place-items:center;
+  padding:clamp(14px,3vw,32px);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* ---------- animated gradient background ---------- */
+.bg-gradient,
+.bg-aurora,
+.bg-grid,
+.bg-vignette{ position:fixed; inset:-20%; z-index:-5; pointer-events:none; }
+
+.bg-gradient{
+  background:
+    radial-gradient(60% 60% at 15% 20%, #1b1147 0%, transparent 60%),
+    radial-gradient(55% 55% at 85% 15%, #072a45 0%, transparent 60%),
+    radial-gradient(65% 65% at 75% 85%, #37093a 0%, transparent 60%),
+    radial-gradient(70% 70% at 25% 90%, #04203a 0%, transparent 62%),
+    linear-gradient(135deg,#05060f,#0a0b1e 45%,#05060f);
+  background-size:200% 200%;
+  animation:gradientDrift 22s ease-in-out infinite;
+  filter:saturate(1.15);
+}
+@keyframes gradientDrift{
+  0%,100%{ background-position:0% 50%, 100% 0%, 100% 100%, 0% 100%, 0% 50%; }
+  33%    { background-position:60% 20%, 40% 60%, 20% 40%, 80% 20%, 100% 50%; }
+  66%    { background-position:30% 80%, 70% 30%, 60% 10%, 30% 60%, 50% 100%; }
+}
+
+.bg-aurora{
+  background:
+    conic-gradient(from 0deg at 50% 50%,
+      rgba(34,231,255,.10), rgba(168,85,247,.14), rgba(255,63,164,.10),
+      rgba(34,231,255,.10));
+  filter:blur(90px);
+  animation:auroraSpin 40s linear infinite;
+  opacity:.75;
+}
+@keyframes auroraSpin{ to{ transform:rotate(360deg) } }
+
+.bg-grid{
+  inset:0;
+  background-image:
+    linear-gradient(rgba(120,160,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120,160,255,.05) 1px, transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(circle at 50% 45%, #000 10%, transparent 72%);
+  -webkit-mask-image:radial-gradient(circle at 50% 45%, #000 10%, transparent 72%);
+  animation:gridPan 30s linear infinite;
+}
+@keyframes gridPan{ to{ background-position:56px 56px, 56px 56px } }
+
+.bg-vignette{
+  inset:0;
+  background:radial-gradient(120% 90% at 50% 50%, transparent 45%, rgba(0,0,0,.65) 100%);
+}
+
+/* canvas layers */
+#particles{ position:fixed; inset:0; z-index:-2; pointer-events:none; }
+#fx{ position:fixed; inset:0; z-index:60; pointer-events:none; }
+
+/* floating CSS bubbles (in addition to canvas particles) */
+.bubbles{ position:fixed; inset:0; z-index:-3; overflow:hidden; pointer-events:none; }
+.bubble{
+  position:absolute; bottom:-16vh;
+  width:var(--s); height:var(--s);
+  border-radius:50%;
+  background:radial-gradient(circle at 32% 28%, rgba(255,255,255,.42), rgba(255,255,255,.04) 42%, transparent 68%);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 0 22px rgba(34,231,255,.14), inset 0 0 18px rgba(168,85,247,.14);
+  animation:floatUp var(--d) linear var(--delay) infinite;
+  opacity:0;
+}
+@keyframes floatUp{
+  0%{ transform:translate3d(0,0,0) scale(.6); opacity:0 }
+  10%{ opacity:.65 }
+  50%{ transform:translate3d(var(--x), -55vh, 0) scale(1); }
+  90%{ opacity:.5 }
+  100%{ transform:translate3d(calc(var(--x) * -.6), -118vh, 0) scale(1.15); opacity:0 }
+}
+
+/* ============================ layout ============================ */
+.wrap{ width:var(--card-w); position:relative; z-index:2; }
+
+.brand{
+  text-align:center;
+  margin:0 0 clamp(14px,2.4vw,22px);
+  animation:dropIn .9s var(--ease-back) both;
+}
+.brand h1{
+  margin:0;
+  font-size:clamp(25px,6.4vw,46px);
+  font-weight:900;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  background:linear-gradient(100deg,#22e7ff,#a855f7 38%,#ff3fa4 62%,#22e7ff);
+  background-size:220% 100%;
+  -webkit-background-clip:text; background-clip:text;
+  color:transparent;
+  filter:drop-shadow(0 0 22px rgba(168,85,247,.45));
+  animation:hueSlide 7s linear infinite;
+}
+@keyframes hueSlide{ to{ background-position:220% 0 } }
+.brand .tag{
+  margin-top:8px; font-size:clamp(10px,2.6vw,12px); letter-spacing:.42em;
+  text-transform:uppercase; color:var(--muted);
+}
+
+@keyframes dropIn{
+  from{ opacity:0; transform:translateY(-26px) scale(.96); filter:blur(6px) }
+  to{ opacity:1; transform:none; filter:blur(0) }
+}
+
+/* ---------- glass card + glowing animated border ---------- */
+.card{
+  position:relative;
+  border-radius:26px;
+  padding:clamp(20px,4.4vw,34px);
+  background:linear-gradient(160deg, rgba(255,255,255,.075), rgba(255,255,255,.02));
+  backdrop-filter:blur(22px) saturate(150%);
+  -webkit-backdrop-filter:blur(22px) saturate(150%);
+  border:1px solid var(--stroke);
+  box-shadow:
+    0 30px 80px rgba(0,0,0,.55),
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 -30px 60px rgba(10,10,40,.35);
+  animation:cardIn 1.05s var(--ease-back) .12s both;
+  transition:box-shadow .5s var(--ease), transform .5s var(--ease);
+  overflow:hidden;
+}
+@keyframes cardIn{
+  from{ opacity:0; transform:translateY(56px) scale(.9) rotateX(12deg); filter:blur(12px) }
+  to{ opacity:1; transform:none; filter:blur(0) }
+}
+/* rotating conic glow ring */
+.card::before{
+  content:"";
+  position:absolute; inset:-2px;
+  border-radius:inherit;
+  padding:2px;
+  background:conic-gradient(from var(--ang,0deg),
+    var(--cyan), var(--violet), var(--pink), var(--cyan));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude;
+  opacity:.75;
+  animation:spinAng 6s linear infinite;
+  pointer-events:none;
+}
+@property --ang{ syntax:'<angle>'; initial-value:0deg; inherits:false; }
+@keyframes spinAng{ to{ --ang:360deg } }
+/* soft outer bloom */
+.card::after{
+  content:"";
+  position:absolute; inset:-40px;
+  border-radius:inherit;
+  background:radial-gradient(circle at 50% 0%, rgba(34,231,255,.16), transparent 60%);
+  pointer-events:none;
+  opacity:.9;
+}
+
+.card.win{
+  box-shadow:
+    0 0 0 1px rgba(124,255,107,.5),
+    0 0 60px rgba(124,255,107,.35),
+    0 0 140px rgba(124,255,107,.22),
+    0 30px 80px rgba(0,0,0,.55);
+  animation:winPulse 1.5s var(--ease) 3;
+}
+@keyframes winPulse{
+  0%,100%{ transform:scale(1) }
+  22%{ transform:scale(1.028) }
+  45%{ transform:scale(.995) }
+}
+.card.shake{ animation:shake .55s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes shake{
+  10%,90%{ transform:translateX(-2px) rotate(-.25deg) }
+  20%,80%{ transform:translateX(5px) rotate(.4deg) }
+  30%,50%,70%{ transform:translateX(-10px) rotate(-.6deg) }
+  40%,60%{ transform:translateX(10px) rotate(.6deg) }
+}
+
+/* ---------- stat strip ---------- */
+.stats{
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:10px; margin-bottom:clamp(16px,3vw,22px);
+}
+.stat{
+  position:relative;
+  border-radius:16px; padding:12px 8px;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  text-align:center;
+  transition:transform .35s var(--ease-back), background .35s, border-color .35s, box-shadow .35s;
+  animation:fadeUp .7s var(--ease) both;
+  overflow:hidden;
+}
+.stat:nth-child(1){ animation-delay:.35s } .stat:nth-child(2){ animation-delay:.44s } .stat:nth-child(3){ animation-delay:.53s }
+.stat:hover{ transform:translateY(-3px); background:rgba(255,255,255,.07); border-color:rgba(34,231,255,.35); box-shadow:0 10px 26px rgba(0,0,0,.35); }
+.stat .k{ display:block; font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+.stat .v{
+  display:block; font-size:clamp(20px,5.4vw,26px); font-weight:800;
+  font-variant-numeric:tabular-nums; letter-spacing:.02em;
+  text-shadow:0 0 18px rgba(34,231,255,.35);
+}
+.stat .v.bump{ animation:bump .45s var(--ease-back); }
+@keyframes bump{ 0%{transform:scale(1)} 40%{transform:scale(1.32); filter:brightness(1.5)} 100%{transform:scale(1)} }
+#best{ color:var(--amber); text-shadow:0 0 18px rgba(255,179,71,.45); }
+#rangeLo,#rangeHi{ color:var(--cyan) }
+
+@keyframes fadeUp{ from{opacity:0; transform:translateY(18px)} to{opacity:1; transform:none} }
+
+/* ---------- instruction ---------- */
+.instruction{
+  text-align:center;
+  font-size:clamp(13px,3.3vw,16px);
+  font-weight:600;
+  letter-spacing:.04em;
+  margin:0 0 clamp(16px,3vw,22px);
+  background:linear-gradient(90deg,#8b95c9 0%, #eaf2ff 25%, #22e7ff 50%, #eaf2ff 75%, #8b95c9 100%);
+  background-size:250% 100%;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation:shine 5s linear infinite, fadeUp .7s var(--ease) .28s both;
+}
+@keyframes shine{ to{ background-position:-250% 0 } }
+.instruction b{ color:transparent; font-weight:900; }
+
+/* ---------- big number display ---------- */
+.display{
+  position:relative;
+  height:clamp(96px,26vw,132px);
+  border-radius:20px;
+  display:grid; place-items:center;
+  background:
+    radial-gradient(80% 120% at 50% 0%, rgba(34,231,255,.10), transparent 70%),
+    rgba(4,6,20,.55);
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:inset 0 0 40px rgba(0,0,0,.5);
+  overflow:hidden;
+  margin-bottom:clamp(16px,3vw,20px);
+  animation:fadeUp .7s var(--ease) .2s both;
+}
+.display::after{ /* scanline sweep */
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent, rgba(34,231,255,.10), transparent);
+  transform:translateX(-100%);
+  animation:sweep 4.5s ease-in-out infinite;
+}
+@keyframes sweep{ 0%{transform:translateX(-100%)} 55%,100%{transform:translateX(100%)} }
+
+.bigNum{
+  font-size:clamp(48px,15vw,80px);
+  font-weight:900; line-height:1;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.02em;
+  background:linear-gradient(180deg,#ffffff,#8ad8ff 55%,#22e7ff);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 0 26px rgba(34,231,255,.55));
+  transition:filter .4s var(--ease);
+}
+.bigNum.flip{ animation:numFlip .55s var(--ease-back); }
+@keyframes numFlip{
+  0%{ transform:rotateX(-90deg) scale(.7); opacity:0; filter:blur(6px) }
+  60%{ transform:rotateX(12deg) scale(1.1); opacity:1; filter:blur(0) }
+  100%{ transform:none; }
+}
+.bigNum.hot{ background:linear-gradient(180deg,#fff,#ffb347 55%,#ff4d6d); filter:drop-shadow(0 0 28px rgba(255,77,109,.6)) }
+.bigNum.cold{ background:linear-gradient(180deg,#fff,#9fe4ff 55%,#5bc8ff); filter:drop-shadow(0 0 28px rgba(91,200,255,.6)) }
+.bigNum.won{ background:linear-gradient(180deg,#fff,#c6ffb8 55%,#7CFF6B); filter:drop-shadow(0 0 34px rgba(124,255,107,.75)) }
+.bigNum.hidden-dash{ opacity:.35 }
+.hint{
+  position:absolute; bottom:9px;
+  font-size:10px; letter-spacing:.26em; text-transform:uppercase; color:var(--muted);
+}
+
+/* ---------- proximity meter ---------- */
+.meter{ margin-bottom:clamp(16px,3vw,20px); animation:fadeUp .7s var(--ease) .3s both; }
+.meter .labels{
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted);
+  margin-bottom:8px;
+}
+#proxPct{ color:var(--text); font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.06em }
+.track{
+  position:relative; height:12px; border-radius:99px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);
+  overflow:hidden;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.5);
+}
+.fill{
+  position:absolute; inset:0 auto 0 0; width:0%;
+  border-radius:99px;
+  background:linear-gradient(90deg,#5bc8ff,#a855f7 45%,#ffb347 78%,#ff4d6d);
+  box-shadow:0 0 18px rgba(168,85,247,.65);
+  transition:width .85s var(--ease), box-shadow .5s var(--ease), filter .5s;
+}
+.fill::after{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  transform:translateX(-100%);
+  animation:fillShine 2.2s ease-in-out infinite;
+}
+@keyframes fillShine{ 0%{transform:translateX(-100%)} 60%,100%{transform:translateX(220%)} }
+.fill.win{ background:linear-gradient(90deg,#7CFF6B,#22e7ff); box-shadow:0 0 26px rgba(124,255,107,.8) }
+
+/* ---------- feedback ---------- */
+.feedback{
+  min-height:52px;
+  display:grid; place-items:center;
+  margin-bottom:clamp(14px,2.6vw,18px);
+}
+.msg{
+  display:flex; align-items:center; gap:10px;
+  padding:11px 20px; border-radius:99px;
+  font-weight:800; font-size:clamp(13px,3.4vw,16px);
+  letter-spacing:.02em;
+  border:1px solid currentColor;
+  background:rgba(255,255,255,.05);
+  opacity:0;
+  white-space:nowrap;
+}
+.msg .emo{ font-size:1.25em; filter:drop-shadow(0 0 8px currentColor) }
+.msg.high{ color:var(--red);  background:rgba(255,77,109,.10);  box-shadow:0 0 30px rgba(255,77,109,.30) }
+.msg.low{  color:var(--ice);  background:rgba(91,200,255,.10);  box-shadow:0 0 30px rgba(91,200,255,.30) }
+.msg.win{  color:var(--lime); background:rgba(124,255,107,.12); box-shadow:0 0 40px rgba(124,255,107,.45) }
+.msg.warn{ color:var(--amber);background:rgba(255,179,71,.10);  box-shadow:0 0 26px rgba(255,179,71,.28) }
+.msg.in-right{ animation:slideRight .55s var(--ease-back) forwards }
+.msg.in-left{  animation:slideLeft  .55s var(--ease-back) forwards }
+.msg.in-pop{   animation:popIn      .6s  var(--ease-back) forwards }
+@keyframes slideRight{ from{opacity:0; transform:translateX(56px) scale(.9); filter:blur(5px)} to{opacity:1; transform:none; filter:blur(0)} }
+@keyframes slideLeft{  from{opacity:0; transform:translateX(-56px) scale(.9); filter:blur(5px)} to{opacity:1; transform:none; filter:blur(0)} }
+@keyframes popIn{ 0%{opacity:0; transform:scale(.5)} 55%{opacity:1; transform:scale(1.14)} 100%{opacity:1; transform:scale(1)} }
+
+/* ---------- input + buttons ---------- */
+.row{ display:flex; gap:12px; margin-bottom:14px; animation:fadeUp .7s var(--ease) .4s both; }
+@media (max-width:430px){ .row{ flex-direction:column } }
+
+.field{ position:relative; flex:1 1 auto; }
+input[type=number]{
+  width:100%; height:60px;
+  padding:0 18px;
+  font:inherit; font-size:clamp(18px,4.6vw,22px); font-weight:800;
+  text-align:center; letter-spacing:.08em;
+  color:var(--text);
+  background:rgba(4,6,20,.6);
+  border:1.5px solid rgba(255,255,255,.12);
+  border-radius:16px;
+  outline:none;
+  transition:border-color .35s var(--ease), box-shadow .35s var(--ease), background .35s, transform .35s var(--ease-back);
+  animation:inputPulse 3.2s ease-in-out infinite;
+  -moz-appearance:textfield;
+}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+input::placeholder{ color:#5c67a0; font-weight:600; letter-spacing:.14em; font-size:.82em }
+@keyframes inputPulse{
+  0%,100%{ box-shadow:0 0 0 0 rgba(34,231,255,.0), inset 0 0 22px rgba(34,231,255,.05) }
+  50%    { box-shadow:0 0 22px 0 rgba(34,231,255,.22), inset 0 0 22px rgba(34,231,255,.10) }
+}
+input:focus{
+  border-color:var(--cyan);
+  background:rgba(4,10,26,.8);
+  transform:translateY(-2px);
+  box-shadow:0 0 0 4px rgba(34,231,255,.14), 0 0 34px rgba(34,231,255,.45), inset 0 0 26px rgba(34,231,255,.14);
+  animation:none;
+}
+input:disabled{ opacity:.45; animation:none; cursor:not-allowed }
+
+.btn{
+  position:relative;
+  border:0; cursor:pointer;
+  font:inherit; font-weight:900;
+  letter-spacing:.16em; text-transform:uppercase;
+  color:#04101c;
+  border-radius:16px;
+  overflow:hidden;
+  isolation:isolate;
+  transition:transform .3s var(--ease-back), box-shadow .35s var(--ease), filter .3s, opacity .3s;
+  -webkit-tap-highlight-color:transparent;
+}
+.btn::before{ /* animated sheen */
+  content:""; position:absolute; inset:0; z-index:-1;
+  background:linear-gradient(115deg, transparent 20%, rgba(255,255,255,.55) 45%, transparent 70%);
+  transform:translateX(-120%);
+  transition:transform .7s var(--ease);
+}
+.btn:hover::before{ transform:translateX(120%) }
+
+.btn-guess{
+  flex:0 0 auto; min-width:160px; height:60px;
+  font-size:clamp(14px,3.6vw,16px);
+  background:linear-gradient(120deg,#22e7ff,#a855f7 55%,#ff3fa4);
+  background-size:200% 100%;
+  box-shadow:0 10px 30px rgba(34,231,255,.30), 0 0 0 1px rgba(255,255,255,.14) inset;
+  animation:btnHue 5s linear infinite;
+}
+@keyframes btnHue{ to{ background-position:200% 0 } }
+.btn-guess:hover{ transform:translateY(-3px) scale(1.045); box-shadow:0 16px 46px rgba(168,85,247,.55), 0 0 40px rgba(34,231,255,.5) }
+.btn-guess:active{ transform:translateY(0) scale(.97) }
+.btn-guess:disabled{ opacity:.4; cursor:not-allowed; transform:none; filter:grayscale(.55) }
+@media (max-width:430px){ .btn-guess{ width:100% } }
+
+.actions{ display:flex; gap:12px; animation:fadeUp .7s var(--ease) .48s both }
+.btn-ghost{
+  flex:1; height:50px;
+  font-size:12px;
+  color:var(--text);
+  background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.14);
+}
+.btn-ghost:hover{ transform:translateY(-2px) scale(1.02); background:rgba(255,255,255,.10); box-shadow:0 10px 28px rgba(0,0,0,.4), 0 0 24px rgba(168,85,247,.28); border-color:rgba(168,85,247,.5) }
+.btn-ghost:active{ transform:scale(.98) }
+#playAgainBtn{
+  display:none;
+  color:#04180a;
+  background:linear-gradient(120deg,#7CFF6B,#22e7ff);
+  border:0;
+  box-shadow:0 10px 30px rgba(124,255,107,.35);
+}
+#playAgainBtn.show{ display:block; animation:popIn .6s var(--ease-back) both }
+#playAgainBtn:hover{ box-shadow:0 14px 42px rgba(124,255,107,.6), 0 0 36px rgba(34,231,255,.45) }
+
+/* ripple */
+.ripple{
+  position:absolute; border-radius:50%;
+  transform:translate(-50%,-50%) scale(0);
+  background:radial-gradient(circle, rgba(255,255,255,.85), rgba(255,255,255,0) 70%);
+  pointer-events:none;
+  animation:ripple .65s ease-out forwards;
+}
+@keyframes ripple{ to{ transform:translate(-50%,-50%) scale(1); opacity:0 } }
+
+/* ---------- history chips ---------- */
+.history{
+  display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+  margin-top:clamp(16px,3vw,20px);
+  min-height:30px;
+}
+.chip{
+  font-size:12px; font-weight:800; font-variant-numeric:tabular-nums;
+  padding:6px 12px; border-radius:99px;
+  border:1px solid currentColor;
+  background:rgba(255,255,255,.04);
+  animation:chipIn .45s var(--ease-back) both;
+  transition:transform .25s var(--ease-back);
+}
+.chip:hover{ transform:translateY(-3px) scale(1.08) }
+.chip.high{ color:var(--red) } .chip.low{ color:var(--ice) } .chip.win{ color:var(--lime); box-shadow:0 0 18px rgba(124,255,107,.5) }
+@keyframes chipIn{ from{opacity:0; transform:translateY(10px) scale(.6)} to{opacity:1; transform:none} }
+
+/* card reset animation */
+.card.resetting{ animation:resetSpin .75s var(--ease) both }
+@keyframes resetSpin{
+  0%{ transform:none; opacity:1 }
+  45%{ transform:translateY(14px) scale(.94) rotateX(-8deg); opacity:.25; filter:blur(8px) }
+  100%{ transform:none; opacity:1; filter:blur(0) }
+}
+
+footer{
+  text-align:center; margin-top:16px;
+  font-size:10px; letter-spacing:.3em; text-transform:uppercase; color:#4c5686;
+  animation:fadeUp .7s var(--ease) .6s both;
+}
+kbd{
+  font:inherit; font-size:9px; padding:2px 6px; border-radius:5px;
+  border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.06); color:var(--muted);
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-gradient"></div>
+<div class="bg-aurora"></div>
+<div class="bg-grid"></div>
+<div class="bg-vignette"></div>
+<div class="bubbles" id="bubbles" aria-hidden="true"></div>
+<canvas id="particles" aria-hidden="true"></canvas>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<main class="wrap">
+  <header class="brand">
+    <h1>Neon Hunter</h1>
+    <div class="tag">Number Guessing Protocol</div>
+  </header>
+
+  <section class="card" id="card">
+    <div class="stats">
+      <div class="stat"><span class="k">Attempts</span><span class="v" id="attempts">0</span></div>
+      <div class="stat"><span class="k">Best Score</span><span class="v" id="best">—</span></div>
+      <div class="stat"><span class="k">Range</span><span class="v" style="font-size:clamp(15px,3.8vw,19px)"><span id="rangeLo">1</span><span style="color:var(--muted)"> – </span><span id="rangeHi">100</span></span></div>
+    </div>
+
+    <p class="instruction">Guess a number between <b>1</b> and <b>100</b></p>
+
+    <div class="display">
+      <div class="bigNum hidden-dash" id="bigNum">--</div>
+      <div class="hint" id="hint">Awaiting your first guess</div>
+    </div>
+
+    <div class="meter">
+      <div class="labels">
+        <span>❄️ Cold</span>
+        <span id="proxPct">0%</span>
+        <span>Hot 🔥</span>
+      </div>
+      <div class="track"><div class="fill" id="fill"></div></div>
+    </div>
+
+    <div class="feedback"><div id="msg"></div></div>
+
+    <div class="row">
+      <div class="field">
+        <input id="guessInput" type="number" min="1" max="100" inputmode="numeric"
+               placeholder="ENTER 1 – 100" autocomplete="off" aria-label="Your guess" />
+      </div>
+      <button class="btn btn-guess" id="guessBtn">Guess</button>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-ghost" id="playAgainBtn">🎮 Play Again</button>
+      <button class="btn btn-ghost" id="restartBtn">↻ Restart Game</button>
+      <button class="btn btn-ghost" id="clearBtn">🗑 Reset Best</button>
+    </div>
+
+    <div class="history" id="history"></div>
+  </section>
+
+  <footer>Press <kbd>Enter</kbd> to lock in your guess</footer>
+</main>
+
+<script>
+(() => {
+"use strict";
+
+/* ===================== state ===================== */
+const MIN = 1, MAX = 100, KEY = "neonhunt.best.v1";
+let target = 0, attempts = 0, won = false, lo = MIN, hi = MAX, displayed = 0;
+
+const $ = id => document.getElementById(id);
+const card = $("card"), input = $("guessInput"), guessBtn = $("guessBtn"),
+      playAgainBtn = $("playAgainBtn"), restartBtn = $("restartBtn"), clearBtn = $("clearBtn"),
+      msgBox = $("msg"), bigNum = $("bigNum"), hint = $("hint"), fill = $("fill"),
+      proxPct = $("proxPct"), attemptsEl = $("attempts"), bestEl = $("best"),
+      rangeLo = $("rangeLo"), rangeHi = $("rangeHi"), historyEl = $("history");
+
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const rnd = (a,b) => Math.random()*(b-a)+a;
+
+/* ===================== audio (tiny WebAudio blips) ===================== */
+let actx = null;
+function beep(freq, dur = .12, type = "sine", gain = .05){
+  try{
+    if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if(actx.state === "suspended") actx.resume();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, actx.currentTime);
+    g.gain.setValueAtTime(0, actx.currentTime);
+    g.gain.linearRampToValueAtTime(gain, actx.currentTime + .01);
+    g.gain.exponentialRampToValueAtTime(.0001, actx.currentTime + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(); o.stop(actx.currentTime + dur + .02);
+  }catch(e){}
+}
+const chord = (notes, step=.09) => notes.forEach((f,i)=> setTimeout(()=>beep(f,.30,"triangle",.045), i*step*1000));
+
+/* ===================== background bubbles ===================== */
+(function bubbles(){
+  const host = $("bubbles"), n = window.innerWidth < 640 ? 12 : 20, frag = document.createDocumentFragment();
+  for(let i=0;i<n;i++){
+    const b = document.createElement("div");
+    b.className = "bubble";
+    const s = rnd(10,64);
+    b.style.setProperty("--s", s.toFixed(0)+"px");
+    b.style.setProperty("--x", rnd(-90,90).toFixed(0)+"px");
+    b.style.setProperty("--d", rnd(16,34).toFixed(1)+"s");
+    b.style.setProperty("--delay", (-rnd(0,30)).toFixed(1)+"s");
+    b.style.left = rnd(0,100).toFixed(2)+"%";
+    frag.appendChild(b);
+  }
+  host.appendChild(frag);
+})();
+
+/* ===================== canvas particle field ===================== */
+const pc = $("particles"), pctx = pc.getContext("2d");
+let parts = [], dpr = 1, W = 0, H = 0;
+function sizeCanvas(cv){
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W*dpr; cv.height = H*dpr;
+  cv.style.width = W+"px"; cv.style.height = H+"px";
+  cv.getContext("2d").setTransform(dpr,0,0,dpr,0,0);
+}
+const HUES = ["34,231,255","168,85,247","255,63,164","124,255,107"];
+function makeParticles(){
+  const count = Math.round(Math.min(90, (W*H)/16000));
+  parts = Array.from({length:count}, () => ({
+    x: rnd(0,W), y: rnd(0,H), r: rnd(.7,2.6),
+    vx: rnd(-.22,.22), vy: rnd(-.42,-.06),
+    a: rnd(.18,.7), c: HUES[(Math.random()*HUES.length)|0], t: rnd(0,Math.PI*2)
+  }));
+}
+function drawParticles(){
+  pctx.clearRect(0,0,W,H);
+  for(const p of parts){
+    p.t += .015; p.x += p.vx + Math.sin(p.t)*.16; p.y += p.vy;
+    if(p.y < -12){ p.y = H+12; p.x = rnd(0,W); }
+    if(p.x < -12) p.x = W+12; else if(p.x > W+12) p.x = -12;
+    const glow = p.r*4.5;
+    const g = pctx.createRadialGradient(p.x,p.y,0,p.x,p.y,glow);
+    g.addColorStop(0, `rgba(${p.c},${p.a})`);
+    g.addColorStop(1, `rgba(${p.c},0)`);
+    pctx.fillStyle = g;
+    pctx.beginPath(); pctx.arc(p.x,p.y,glow,0,7); pctx.fill();
+  }
+  requestAnimationFrame(drawParticles);
+}
+
+/* ===================== FX canvas (confetti / bursts) ===================== */
+const fx = $("fx"), fxc = fx.getContext("2d");
+let bits = [], fxRunning = false;
+function fxLoop(){
+  fxc.clearRect(0,0,W,H);
+  bits = bits.filter(b => b.life > 0);
+  for(const b of bits){
+    b.life--; b.vy += b.g; b.vx *= .995; b.x += b.vx; b.y += b.vy; b.rot += b.vr;
+    const alpha = Math.max(0, Math.min(1, b.life/b.max*1.6));
+    fxc.save(); fxc.translate(b.x,b.y); fxc.rotate(b.rot); fxc.globalAlpha = alpha;
+    fxc.fillStyle = b.color;
+    if(b.shape === 0){ fxc.fillRect(-b.w/2,-b.h/2,b.w,b.h); }
+    else if(b.shape === 1){ fxc.beginPath(); fxc.arc(0,0,b.w/2,0,7); fxc.fill(); }
+    else { fxc.beginPath(); fxc.moveTo(0,-b.h/2); fxc.lineTo(b.w/2,b.h/2); fxc.lineTo(-b.w/2,b.h/2); fxc.closePath(); fxc.fill(); }
+    fxc.restore();
+  }
+  if(bits.length){ requestAnimationFrame(fxLoop); } else { fxRunning = false; fxc.clearRect(0,0,W,H); }
+}
+function startFx(){ if(!fxRunning){ fxRunning = true; requestAnimationFrame(fxLoop); } }
+const COLORS = ["#22e7ff","#a855f7","#ff3fa4","#7CFF6B","#ffb347","#ffffff"];
+function confetti(x, y, amount = 120, power = 13){
+  if(reduce) return;
+  for(let i=0;i<amount;i++){
+    const ang = rnd(0, Math.PI*2), sp = rnd(power*.25, power);
+    bits.push({
+      x, y, vx: Math.cos(ang)*sp, vy: Math.sin(ang)*sp - rnd(1,5),
+      g: rnd(.16,.30), w: rnd(5,11), h: rnd(7,15), rot: rnd(0,7), vr: rnd(-.3,.3),
+      color: COLORS[(Math.random()*COLORS.length)|0],
+      life: (rnd(70,150))|0, max:150, shape:(Math.random()*3)|0
+    });
+  }
+  startFx();
+}
+function sparkBurst(x, y, amount = 26){
+  if(reduce) return;
+  for(let i=0;i<amount;i++){
+    const ang = rnd(0,Math.PI*2), sp = rnd(2,7);
+    bits.push({
+      x, y, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp, g:.02,
+      w:rnd(2,4), h:rnd(2,4), rot:0, vr:0,
+      color: COLORS[(Math.random()*COLORS.length)|0], life:(rnd(24,46))|0, max:46, shape:1
+    });
+  }
+  startFx();
+}
+
+function resizeAll(){ sizeCanvas(pc); sizeCanvas(fx); makeParticles(); }
+addEventListener("resize", resizeAll, {passive:true});
+resizeAll();
+if(!reduce) requestAnimationFrame(drawParticles);
+
+/* ===================== helpers ===================== */
+function countTo(el, to, dur = 550){
+  const from = parseInt(el.textContent, 10) || 0;
+  if(from === to){ el.textContent = to; return; }
+  const t0 = performance.now();
+  (function step(now){
+    const p = Math.min(1, (now - t0)/dur);
+    const e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (to - from)*e);
+    if(p < 1) requestAnimationFrame(step);
+  })(t0);
+  el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
+}
+
+function setMsg(text, emoji, cls, anim){
+  msgBox.innerHTML = "";
+  const d = document.createElement("div");
+  d.className = `msg ${cls} ${anim}`;
+  d.innerHTML = `<span class="emo">${emoji}</span><span>${text}</span>`;
+  msgBox.appendChild(d);
+}
+
+function replay(el, cls){ el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+function setBigNum(value, tone){
+  bigNum.classList.remove("hot","cold","won","hidden-dash");
+  if(tone) bigNum.classList.add(tone);
+  bigNum.textContent = value;
+  replay(bigNum, "flip");
+}
+
+function proximity(guess){
+  // 100% at exact, decaying with distance across the full span
+  const d = Math.abs(guess - target);
+  return Math.max(0, Math.round((1 - d/(MAX - MIN)) * 100));
+}
+
+/* ===================== best score ===================== */
+function loadBest(){
+  const v = parseInt(localStorage.getItem(KEY) || "", 10);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+function renderBest(){
+  const b = loadBest();
+  bestEl.textContent = b ?? "—";
+}
+function saveBest(n){
+  const b = loadBest();
+  if(b === null || n < b){
+    localStorage.setItem(KEY, String(n));
+    renderBest();
+    replay(bestEl, "bump");
+    return true;
+  }
+  return false;
+}
+
+/* ===================== game ===================== */
+function newGame(animate = true){
+  target = Math.floor(Math.random()*(MAX - MIN + 1)) + MIN;
+  attempts = 0; won = false; lo = MIN; hi = MAX;
+
+  attemptsEl.textContent = "0";
+  rangeLo.textContent = MIN; rangeHi.textContent = MAX;
+  historyEl.innerHTML = "";
+  msgBox.innerHTML = "";
+  fill.style.width = "0%"; fill.classList.remove("win");
+  proxPct.textContent = "0%";
+  bigNum.className = "bigNum hidden-dash"; bigNum.textContent = "--";
+  hint.textContent = "Awaiting your first guess";
+
+  input.disabled = false; guessBtn.disabled = false;
+  input.value = ""; 
+  playAgainBtn.classList.remove("show");
+  card.classList.remove("win");
+
+  if(animate && !reduce) replay(card, "resetting");
+  renderBest();
+  setTimeout(() => { if(innerWidth > 720) input.focus(); }, animate ? 420 : 0);
+}
+
+function addChip(value, cls, label){
+  const c = document.createElement("div");
+  c.className = `chip ${cls}`;
+  c.textContent = `${value} ${label}`;
+  historyEl.appendChild(c);
+}
+
+function submitGuess(){
+  if(won) return;
+  const raw = input.value.trim();
+  const g = parseInt(raw, 10);
+
+  if(raw === "" || !Number.isFinite(g)){
+    setMsg("Enter a number first!", "✋", "warn", "in-pop");
+    replay(card, "shake"); beep(180,.16,"square",.04);
+    input.focus(); return;
+  }
+  if(g < MIN || g > MAX){
+    setMsg(`Out of range — stay within ${MIN} and ${MAX}!`, "⚠️", "warn", "in-pop");
+    replay(card, "shake"); beep(160,.18,"square",.04);
+    input.select(); return;
+  }
+
+  attempts++;
+  countTo(attemptsEl, attempts);
+
+  const pct = proximity(g);
+  proxPct.textContent = pct + "%";
+  fill.style.width = pct + "%";
+
+  if(g === target){
+    /* ---------- WIN ---------- */
+    won = true;
+    setBigNum(target, "won");
+    hint.textContent = `Cracked in ${attempts} ${attempts === 1 ? "attempt" : "attempts"}`;
+    fill.style.width = "100%"; fill.classList.add("win"); proxPct.textContent = "100%";
+
+    const isRecord = saveBest(attempts);
+    setMsg(isRecord ? `Correct! New Best Score — ${attempts}!` : "Correct! You Won!", "🎉", "win", "in-pop");
+    addChip(g, "win", "🎯");
+
+    input.disabled = true; guessBtn.disabled = true;
+    card.classList.add("win");
+    playAgainBtn.classList.add("show");
+
+    const r = card.getBoundingClientRect();
+    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+    confetti(cx, cy, 160, 15);
+    setTimeout(() => { confetti(rnd(W*.12,W*.35), rnd(H*.18,H*.4), 80, 12); }, 220);
+    setTimeout(() => { confetti(rnd(W*.65,W*.88), rnd(H*.18,H*.4), 80, 12); }, 420);
+    setTimeout(() => { confetti(cx, cy, 90, 11); }, 680);
+    chord([523.25, 659.25, 783.99, 1046.5]);
+    return;
+  }
+
+  /* ---------- HIGH / LOW ---------- */
+  const high = g > target;
+  if(high){ hi = Math.min(hi, g - 1); } else { lo = Math.max(lo, g + 1); }
+  rangeLo.textContent = lo; rangeHi.textContent = hi;
+  replay(rangeLo, "bump");
+
+  setBigNum(g, high ? "hot" : "cold");
+
+  const dist = Math.abs(g - target);
+  const heat = dist <= 3 ? "Blazing hot!" : dist <= 8 ? "Very warm" : dist <= 18 ? "Getting warmer" : dist <= 35 ? "Cool" : "Freezing";
+  hint.textContent = `${heat} • ${pct}% close`;
+
+  if(high){
+    setMsg("Too High! Try Again!", "🔥", "high", "in-right");
+    beep(300,.14,"sawtooth",.035);
+  }else{
+    setMsg("Too Low! Try Again!", "❄️", "low", "in-left");
+    beep(190,.14,"sawtooth",.035);
+  }
+  addChip(g, high ? "high" : "low", high ? "🔥" : "❄️");
+
+  replay(card, "shake");
+  input.value = ""; input.focus();
+}
+
+/* ===================== ripple ===================== */
+function attachRipple(btn){
+  btn.addEventListener("pointerdown", e => {
+    const r = btn.getBoundingClientRect();
+    const size = Math.max(r.width, r.height) * 2.2;
+    const s = document.createElement("span");
+    s.className = "ripple";
+    s.style.width = s.style.height = size + "px";
+    s.style.left = (e.clientX - r.left) + "px";
+    s.style.top  = (e.clientY - r.top) + "px";
+    btn.appendChild(s);
+    setTimeout(() => s.remove(), 680);
+  });
+}
+document.querySelectorAll(".btn").forEach(attachRipple);
+
+/* ===================== events ===================== */
+guessBtn.addEventListener("click", e => {
+  const r = guessBtn.getBoundingClientRect();
+  sparkBurst(r.left + r.width/2, r.top + r.height/2, 22);
+  submitGuess();
+});
+
+input.addEventListener("keydown", e => {
+  if(e.key === "Enter"){ e.preventDefault(); submitGuess(); }
+});
+document.addEventListener("keydown", e => {
+  if(e.key === "Enter" && document.activeElement !== input && !won && !input.disabled){
+    input.focus();
+  }
+  if(e.key === "Enter" && won){ newGame(); }
+  if(e.key.toLowerCase() === "r" && document.activeElement !== input){ newGame(); }
+});
+
+playAgainBtn.addEventListener("click", () => newGame());
+restartBtn.addEventListener("click", () => {
+  newGame();
+  setMsg("Game restarted — new number locked in.", "🔄", "warn", "in-pop");
+});
+clearBtn.addEventListener("click", () => {
+  localStorage.removeItem(KEY);
+  renderBest();
+  setMsg("Best score cleared.", "🗑", "warn", "in-pop");
+  replay(bestEl, "bump");
+});
+
+/* keep input clean */
+input.addEventListener("input", () => {
+  input.value = input.value.replace(/[^\d]/g, "").slice(0,3);
+});
+
+/* tilt on desktop for extra premium feel */
+if(matchMedia("(hover:hover) and (pointer:fine)").matches && !reduce){
+  addEventListener("pointermove", e => {
+    const r = card.getBoundingClientRect();
+    const dx = (e.clientX - (r.left + r.width/2)) / r.width;
+    const dy = (e.clientY - (r.top + r.height/2)) / r.height;
+    if(card.classList.contains("shake") || card.classList.contains("resetting")) return;
+    card.style.transform = `perspective(1100px) rotateY(${dx*4}deg) rotateX(${-dy*4}deg)`;
+  }, {passive:true});
+  addEventListener("pointerleave", () => { card.style.transform = ""; });
+}
+
+/* ===================== boot ===================== */
+renderBest();
+newGame(false);
+})();
+</script>
+</body>
+</html>
